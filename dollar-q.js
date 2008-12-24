@@ -1,0 +1,594 @@
+// addAlias allows you call a function by any other name and have it smell as sweet
+Function.prototype.addAlias = function(alias, fn) {
+  this.prototype[alias] = this.prototype[fn];
+};
+
+Function.prototype.addAliases = function(aliases) {
+  var alias;
+  for (alias in aliases) {
+    this.addAlias(alias, aliases[alias]);
+  }
+};
+
+
+/**
+ *  _$Q constructor
+ *
+ */
+var _$Q = function() {
+  this._aSelectProperties = [];
+  this._aAliases          = {};
+  this._aSourceData       = [];
+  this._aAndEvaluators    = [];
+  this._nAndEvaluators    = 0;
+  this._aOrEvaluators     = [];
+  this._nOrEvaluators     = 0;
+  this._aSortProperties   = [];
+  this._nSortProperties   = 0;
+  this._aSortDirections   = [];
+  this._nWhichDirection   = 1;
+  this._aWhichEvaluators  = null;
+  this._sWhichProperty    = null;
+  this._bWhichInverse     = false;
+  this._inverse           = false;
+  this._limit             = null;
+  this._offset            = 0;
+};
+
+
+/**
+ *  SELECT
+ *
+ */
+_$Q.prototype.SELECT = function(sSelectProperty) {
+  for (var i = 0; i < arguments.length; ++i) {
+  	var argument = arguments[i];
+  	if (argument instanceof Array) {
+  		for (var j = 0; j < argument.length; ++j) {	
+  		  var sProperty = argument[j];
+  	    this._aSelectProperties.push(sProperty);
+   	    this._addAlias(sProperty, sProperty);
+  		}
+  	} else {
+      this._aSelectProperties.push(argument);
+      this._addAlias(argument, argument);
+  	}
+  }
+  return this;
+};
+
+
+/**
+ *  AS
+ *
+ */
+_$Q.prototype.AS = function(sAlias) {
+  this._addAlias(this._aAliases[this._aSelectProperties[this._aSelectProperties.length - 1]], sAlias);
+  return this;
+};
+
+
+/**
+ *  FROM
+ *
+ */
+_$Q.prototype.FROM = function() {
+  for (var i = 0; i < arguments.length; ++i) {
+    this._aSourceData = this._aSourceData.concat(arguments[i]);
+  }
+  return this;
+};
+
+
+/**
+ *  WHERE
+ *
+ */
+_$Q.prototype.WHERE = function(sProperty) {
+  if (sProperty instanceof _$Q) {
+    this._aAndEvaluators.push(sProperty);
+    this._nAndEvaluators = this._aAndEvaluators.length;
+  } else {
+    this._aWhichEvaluators = this._aAndEvaluators;
+    this._sWhichProperty = sProperty;
+  }
+  return this;
+};
+
+
+/**
+ *  OR
+ *
+ */
+_$Q.prototype.OR = function(sProperty) {
+  if (sProperty instanceof _$Q) {
+    this._aOrEvaluators.push(sProperty);
+    this._nOrEvaluators = this._aOrEvaluators.length;
+  } else {
+    this._aWhichEvaluators = this._aOrEvaluators;
+    this._sWhichProperty = sProperty;
+  }
+  return this;
+};
+
+
+/**
+ *  NOT
+ *
+ */
+_$Q.prototype.NOT = function() {
+  this._bWhichInverse = true;
+  return this;
+};
+
+
+/**
+ *  ORDER_BY
+ *
+ */
+_$Q.prototype.ORDER_BY = function() {
+  for (var i = arguments.length - 1; i >= 0; --i) {
+    var argument = arguments[i];    
+    switch(argument.toUpperCase()) {
+      case 'ASC':
+        this._nWhichDirection = 1;
+      break;
+      case 'DESC':
+        this._nWhichDirection = -1;
+      break;
+      default:
+        this._aSortProperties.push(argument);
+        this._aSortDirections.push(this._nWhichDirection);
+        this._nSortProperties = this._aSortProperties.length;
+        this._nWhichDirection = 1;
+    }
+  }
+  return this;
+};
+
+
+/**
+ *  LIMIT
+ *
+ */
+_$Q.prototype.LIMIT = function() {
+  if (arguments.length === 1) {
+    this._offset = 0;
+    this._limit = arguments[0];
+  } else {
+    this._offset = arguments[0];
+    this._limit = arguments[1];
+  }
+  return this;
+};
+
+
+/**
+ *  FETCH
+ *
+ */
+_$Q.prototype.FETCH = function(aSourceData) {
+  var aSourceData = aSourceData || this._aSourceData;
+  var aResultData = [];
+  
+  for (var i = 0; i < aSourceData.length; ++i) {
+    var oData = aSourceData[i];
+    if (this._evaluate(oData)) {
+      if (this._aSelectProperties.length > 0) {
+        var oResult = {};
+        for (var j = 0; j < this._aSelectProperties.length; ++j) {
+          var sProperty = this._aSelectProperties[j];
+          oResult[this._aAliases[sProperty]] = this._getDeepValue(oData, sProperty);
+        }
+      }
+      aResultData.push(oResult || oData);
+    }
+  }
+
+  // this used to be above filters -- why? think memento boy....
+  if (this._nSortProperties > 0) {
+    //aResultData = this._sort(aResultData);
+    aResultData = this._quicksort(aResultData, 0, 0);
+  }
+  
+
+  var end = (this._limit != null) ? this._limit : aResultData.length;
+  return aResultData.splice(this._offset, end);
+};
+
+
+/**
+ *  _addAlias
+ *
+ */
+_$Q.prototype._addAlias = function(sProperty, sAlias) {
+  this._aAliases[sProperty] = this._cleanDeepProperty(sAlias);
+};
+
+
+/**
+ *  _addEvaluator
+ *
+ */
+_$Q.prototype._addEvaluator = function(fEvaluator) {
+  var sProperty = this._sWhichProperty;
+  var bInverse  = this._bWhichInverse;
+  var _getDeepValue = this._getDeepValue;
+  var evaluator = {
+    _inverse: bInverse,
+    _evaluate: function(oObject) {
+      return fEvaluator(oObject[sProperty] || _getDeepValue(oObject, sProperty));
+    }
+  };
+  this._aWhichEvaluators.push(evaluator);
+  this._aWhichEvaluators = null;
+  this._sWhichProperty   = null;
+  this._bWhichInverse    = false;
+  this._nAndEvaluators   = this._aAndEvaluators.length;
+  this._nOrEvaluators    = this._aOrEvaluators.length;
+};
+
+
+/**
+ *  _getDeepValue
+ *
+ */
+_$Q.prototype._getDeepValue = function(oObject, sProperty) {
+  if (typeof sProperty === 'undefined') {
+    return oObject;
+  }
+  var d = sProperty.split('.');
+  for (var i = 0; i < d.length; ++i) {
+    oObject[d[i]] = oObject[d[i]] || {};
+    oObject = oObject[d[i]];
+  }
+  return oObject;
+};
+
+
+/**
+ *  _cleanDeepProperty
+ *
+ */
+_$Q.prototype._cleanDeepProperty = function(sProperty) {
+  return sProperty.replace('.', '_');
+};
+
+
+/**
+ *  _evaluate
+ *
+ */
+_$Q.prototype._evaluate = function(oData) {
+  for (var i = 0; i < this._nAndEvaluators; ++i) {
+    var oEvaluator = this._aAndEvaluators[i];
+    if (!(oEvaluator._evaluate(oData) ^ oEvaluator._inverse)) {
+      for (var j = 0; j < this._nOrEvaluators; ++j) {
+        var oEvaluator = this._aOrEvaluators[j];
+        if (oEvaluator._evaluate(oData) ^ oEvaluator._inverse) {
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+  return true;
+};
+
+
+/**
+ *  _quicksort
+ *
+ */
+_$Q.prototype._quicksort = function(aData, nDepth, nSortPropertyIndex) {
+
+  // TODO: Add desc support
+  
+  var aGreater = [],
+      aLess    = [],
+      aEqual   = [],
+      nData    = aData.length;
+
+  if (nData <= 1) {
+    return aData;
+  }
+  
+  if (nDepth === 0 && nSortPropertyIndex === 0) {
+    this._aSortProperties = this._aSortProperties.reverse();
+  }
+  
+  var sSortProperty = this._aSortProperties[nSortPropertyIndex];
+  var nSortDirection = this._aSortDirections[nSortPropertyIndex];
+  
+  console.log('sorting on :' + sSortProperty + ' at depth: ' + nDepth);
+  console.log(this._aSortProperties);
+
+  var pivot = aData[0];
+  var pivotValue = pivot[sSortProperty];
+
+  var obj, objValue;
+  
+
+  for (var i = 0; i < nData; ++i) {
+
+    obj = aData[i];
+    objValue = obj[sSortProperty];  
+    
+    if (objValue < pivotValue) {
+      aLess.push(obj);
+    } else if (objValue > pivotValue) {
+      aGreater.push(obj);
+    } else {
+      aEqual.push(obj);
+    }
+  }
+
+
+  if (nSortPropertyIndex < this._nSortProperties - 1) {
+    aEqual = this._quicksort(aEqual, nDepth, nSortPropertyIndex + 1);
+  }
+
+  return this._quicksort(aLess, nDepth + 1, nSortPropertyIndex).concat(aEqual.concat(this._quicksort(aGreater, nDepth + 1, nSortPropertyIndex)));
+  
+};
+
+
+
+/**
+ *  _sort
+ *
+ */
+/**
+ *  x = isNaN(x) ? x.toLowerCase() : parseFloat(x);
+ *  y = isNaN(y) ? y.toLowerCase() : parseFloat(y);
+ *  
+ *  Need to:
+ *    fix alphanumeric sorting
+ *    implement flat array sorting
+ *    asc + desc sorting
+*/
+_$Q.prototype._sort = function(aData) {
+  for (var i = 0; i < this._nSortProperties; ++i) {
+    var sSortProperty = this._aSortProperties[i];
+    var nSortDirection = this._aSortDirections[i];
+    aData = aData.sort(function(a, b) {
+      var x = a[sSortProperty] || null;
+      var y = b[sSortProperty] || null;      
+      //x = isNaN(x) ? x.toLowerCase() : x;
+      //y = isNaN(y) ? y.toLowerCase() : y;
+      return ((x < y) ? -1 * nSortDirection: ((x > y) ? 1 * nSortDirection: 0));
+    });
+  }
+  return aData;
+};
+
+
+/**
+ *  EQUAL evaluator
+ *
+ */
+_$Q.prototype.EQUAL = function(value) {
+  this._addEvaluator(function(v) { return v == value; });
+  return this;
+};
+
+
+/**
+ *  NOT_EQUAL evaluator
+ *
+ */
+_$Q.prototype.NOT_EQUAL = function(value) {
+  this._addEvaluator(function(v) { return v != value; });
+  return this;
+};
+
+
+/**
+ *  GREATER_THAN evaluator
+ *
+ */
+_$Q.prototype.GREATER_THAN = function(nValue) {
+  this._addEvaluator(function(v) { return v > nValue; });
+  return this;
+};
+
+
+/**
+ *  GREATER_EQUAL evaluator
+ *
+ */
+_$Q.prototype.GREATER_EQUAL = function(nValue) {
+  this._addEvaluator(function(v) { return v >= nValue; });
+  return this;
+};
+
+
+/**
+ *  LESS_THAN evaluator
+ *
+ */
+_$Q.prototype.LESS_THAN = function(nValue) {
+  this._addEvaluator(function(v) { return v < nValue; });
+  return this;
+};
+
+
+/**
+ *  LESS_EQUAL evaluator
+ *
+ */
+_$Q.prototype.LESS_EQUAL = function(nValue) {
+  this._addEvaluator(function(v) { return v <= nValue; });
+  return this;
+};
+
+
+/**
+ *  IS_ARRAY evaluator
+ *
+ */
+_$Q.prototype.IS_ARRAY = function() {
+  this._addEvaluator(function(v) { return v && ((v.constructor && v.constructor.toString().indexOf('Array') > -1) || (typeof v == 'object' && v.constructor == Array)); });
+  return this;
+};
+
+
+/**
+ *  IS_BOOLEAN evaluator
+ *
+ */
+_$Q.prototype.IS_BOOLEAN = function() {
+  this._addEvaluator(function(v) { return typeof v == 'boolean'; });
+  return this;
+};
+
+
+/**
+ *  IS_EMPTY evaluator
+ *
+ */
+_$Q.prototype.IS_EMPTY = function() {
+  this._addEvaluator(function(v) { return v === '' || v === 0 || v === '0' || v === null || v === false || typeof v == 'undefined' || v.length == 0; });
+  return this;
+}
+
+
+/**
+ *  IS_FUNCTION evaluator
+ *
+ */
+_$Q.prototype.IS_FUNCTION = function() {
+  this._addEvaluator(function(v) { return typeof v == 'function'; });
+  return this;
+};
+
+
+/**
+ *  IS_NULL evaluator
+ *
+ */
+_$Q.prototype.IS_NULL = function() {
+  this._addEvaluator(function(v) { return v === null; });  
+  return this;
+}
+
+
+/**
+ *  IS_NUMBER evaluator
+ *
+ */
+_$Q.prototype.IS_NUMBER = function() {
+  this._addEvaluator(function(v) { return typeof v == 'number' && isFinite(v); });
+  return this;
+};
+
+
+/**
+ *  IS_OBJECT evaluator
+ *
+ */
+_$Q.prototype.IS_OBJECT = function() {
+  this._addEvaluator(function(v) { return v && (typeof v == 'object' || typeof v == 'function'); });
+  return this;
+};
+
+
+/**
+ *  IS_STRING evaluator
+ *
+ */
+_$Q.prototype.IS_STRING = function() {
+  this._addEvaluator(function(v) { return typeof v == 'string'; });
+  return this;
+};
+
+
+/**
+ *  IS_UNDEFINED evaluator
+ *
+ */
+_$Q.prototype.IS_UNDEFINED = function() {
+  this._addEvaluator(function(v) { return typeof v == 'undefined'; });  
+  return this;
+}
+
+
+/**
+ *  LIKE evaluator
+ *
+ */
+_$Q.prototype.LIKE = function(sValue) {
+  var sRegExp = sValue.replace(/[\%]/g, '.*');
+  var rRegExp = new RegExp('^' + sRegExp + '$', 'i');
+  this._addEvaluator(function(v) { return rRegExp.test(v); });
+  return this;
+};
+
+
+/**
+ *  REGEXP evaluator
+ *
+ */
+_$Q.prototype.REGEXP = function(rRegExp) {
+  this._addEvaluator(function(v) { return rRegExp.test(v); });
+  return this;
+};
+
+
+/**
+ *  IN_ARRAY evaluator
+ *
+ */
+_$Q.prototype.IN_ARRAY = function(aValues) {
+  var nValues = aValues.length;
+  this._addEvaluator(
+    function(v) {
+      for (var i = 0; i < nValues; ++i) {
+        if (aValues[i] == v) { return true; }
+      }
+      return false;
+    }
+  );
+  return this;
+};
+
+
+/**
+ *  LENGTH evaluator
+ *
+ */
+_$Q.prototype.LENGTH = function(nValue) {
+  this._addEvaluator(function(v) { return v.length == nValue; });
+  return this;
+};
+
+
+/**
+ *  CUSTOM evaluator
+ *
+ */
+_$Q.prototype.CUSTOM = function(fCustomEvaluator) {
+  this._addEvaluator(fCustomEvaluator);
+  return this;
+};
+
+
+/**
+ *  Add method aliases
+ *
+ */
+ _$Q.addAlias('AND', 'WHERE');
+for (i in _$Q.prototype) {
+  _$Q.addAlias(i.toLowerCase(), i);  
+}
+
+
+/**
+ *  $Q wrapper function
+ *
+ */
+var $Q = function() {
+  var q = new _$Q();
+  q.FROM.apply(q, arguments);
+  return q;
+};
