@@ -1,0 +1,355 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>$Q: JavaScript Query Meta-language</title>
+	<style type="text/css" media="screen">
+	body {
+	  font:16px/20px helvetica,arial,sans-serif;
+	  background:#fff;
+	}
+	#page {
+	  width:550px;
+	  margin:auto;
+  }
+  .fn { color:blue; }
+  .arg { color:green; }
+  .optional { font-style:italic; }
+	</style>
+	
+	<script src="http://assets.dev/js/jquery/jquery-1.3.2.min.js" type="text/javascript" charset="utf-8"></script>
+  <script src="http://assets.dev/js/dollarQ/dollarQ-0.9.js" type="text/javascript" charset="utf-8"></script>
+  <script src="http://www.json.org/json2.js" type="text/javascript" charset="utf-8"></script>
+  
+  <!-- SyntaxHighlighter -->
+  <link rel="stylesheet" href="http://assets.dev/js/syntaxhighlighter/styles/shCore.css" type="text/css" media="screen" charset="utf-8"/>
+  <link rel="stylesheet" href="http://assets.dev/js/syntaxhighlighter/styles/shThemeDefault.css" type="text/css" media="screen" charset="utf-8"/>
+  <script src="http://assets.dev/js/syntaxhighlighter/scripts/shCore.js" type="text/javascript" charset="utf-8"></script>
+  <script src="http://assets.dev/js/syntaxhighlighter/scripts/shBrushJScript.js" type="text/javascript" charset="utf-8"></script>
+  <script type="text/javascript">
+  // SyntaxHighlighter.defaults['font-size'] = '50%';
+  // SyntaxHighlighter.defaults['gutter'] = false;
+  // SyntaxHighlighter.config.clipboardSwf = 'http://assets.dev/js/syntaxhighlighter/scripts/clipboard.swf';
+  // SyntaxHighlighter.all();
+  </script>
+
+</head>
+<body>
+  <div id="page">
+    <div id="hd">
+      <h1>$Q JavaScript Query Meta-language</h1>
+      <ul>
+        <li><a href="#introduction">Introduction to $Q</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="#documentation">Documentation</a></li>
+      </ul>
+    </div>
+    <div id="bd">
+      <div id="introduction">
+        <h2>Introduction to $Q</h2>
+        <p>$Q is a lightweight JavaScript library for filtering and sorting large arrays of data.</p>
+      </div>
+      <div id="download">
+        <h2>Download</h2>
+        <dl>
+          <dt>Version 0.9b</dt>
+          <dd>
+            <ul>
+              <li><a href="#">Uncompressed</a></li>
+              <li><a href="#">Minified</a></li>
+            </ul>
+          </dd>
+        </dl>
+      </div>
+      <div id="documentation">
+        <h2>Documentation</h2>
+        <div id="getting-started">
+          <h3>Getting Started</h3>
+          <ul>
+            <li><a href="#">Downloading $Q</a></li>
+            <li><a href="#">Installing $Q</a></li>
+            <li><a href="#">Quick Start</a></li>
+          </ul>
+        </div>
+        <div id="api-reference">
+          <h3>$Q API Reference</h3>
+          <ul>
+            <li><a href="#core">$Q Core</a></li>
+            <li><a href="#comparison-filters">Comparison Filters</a></li>
+            <li><a href="#type-filters">Type Filters</a></li>
+          </ul>
+          <div id="core">
+            <h4>$Q Core</h4>
+            <dl>
+              <dt><strong class="fn">$Q</strong> (<span class="arg optional">dataArray, dataArray2, ...</span>)</dt>
+              <dd>
+                <p>Instantiates a query object.</p>
+              </dd>
+              <dt>
+                <strong class="fn">select</strong> (<span class="arg">objectProperty, objectProperty2, ...</span>)
+              </dt>
+              <dd>
+                <p>Sets the properties to be returned. If no arguments are passed, the get() method will return the original objects.</p>
+                <em class="warn">Note: There is a difference here!</em>
+                <pre class="brush: js;">
+                  var results = $Q(data).select().get();
+
+                  // [
+                  //   {name:'Mike',   age:37,  gender:'m', occupation:'architect'},
+                  //   {name:'Carol',  age:35,  gender:'f', occupation:'housewife'},
+                  //   {name:'Greg',   age:15,  gender:'m'},
+                  //   {name:'Marcia', age:13,  gender:'f'},
+                  //   {name:'Peter',  age:12,  gender:'m'},
+                  //   {name:'Jan',    age:11,  gender:'f'},
+                  //   {name:'Bobby',  age:9,   gender:'m', pet:{name:'Tiger'}},
+                  //   {name:'Cindy',  age:8,   gender:'f'},
+                  //   {name:'Alice',  age:43,  gender:'f', occupation:'housekeeper'},
+                  //   {name:'Sam',    age:47,  gender:'m', occupation:'butcher'},
+                  //   {name:'Oliver', age:5,   gender:'m'}
+                  // ];
+                  </pre>
+              </dd>
+              <dt>
+                <strong class="fn">from</strong> (<span class="arg">dataArray<span class="optional">, dataArray2, dataObject, ...</span></span>)
+              </dt>
+              <dd>
+                <p>Defines the source data for the query.</p>
+              </dd>
+              <dt>
+                <strong class="fn">where</strong> (<span class="arg">objectProperty, objectProperty2, ...</span>)
+              </dt>
+              <dd>
+                <p>Appends a filter to the query. The where method is slightly different from other core methods as it returns a FilterFactory object. This requires that the <span class="fn">where</span> method (and the <span class="fn">or</span> method) be followed by a filter method. The only exception is when a $Q instance is passed into the where method as a subordinate clause.</p>
+              </dd>
+              <dt>
+                <strong class="fn">or</strong> (<span class="arg">property1, property2, ...</span>)
+              </dt>
+              <dd>
+              </dd>
+              <dt>
+                <strong class="fn">orderBy</strong> (<span class="arg">property1, property2, ...</span>)
+              </dt>
+              <dd>
+              </dd>
+              <dt>
+                <strong class="fn">limit</strong> (<span class="arg">numberOfResults</span>)<br/>
+                <strong class="fn">limit</strong> (<span class="arg">startingOffset, numberOfResults</span>)<br/>
+              </dt>
+              <dd>
+              </dd>
+              <dt>
+                <strong class="fn">get</strong> (&nbsp;)
+              </dt>
+              <dd>
+                <p>Returns an array of objects, filtered from the source data, which meet the specified criteria.</p>
+              </dd>
+              <dt>
+                <strong class="fn">count</strong> (&nbsp;)
+              </dt>
+              <dd>
+                <p>Returns the number of objects from the source data which meet the specified criteria.</p>
+              </dd>
+              <dt>
+                <strong class="fn">page</strong> (<span class="arg">pageNumber, resultsPerPage</span>)
+              </dt>
+              <dd>
+              </dd>
+            </dl>
+          </div>
+        </div>
+        <div id="comparison-filters">
+          <h4>Comparison Filters</h4>
+          <dl>
+            <dt>
+              <strong class="fn">eq</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is equal to passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                var results = $Q(data).where('gender').eq('m').get();
+
+                // [
+                //   {name:'Mike',   age:37,  gender:'m', occupation:'architect'},
+                //   {name:'Greg',   age:15,  gender:'m'},
+                //   {name:'Peter',  age:12,  gender:'m'},
+                //   {name:'Bobby',  age:9,   gender:'m', pet:{name:'Tiger'}},
+                //   {name:'Sam',    age:47,  gender:'m', occupation:'butcher'},
+                //   {name:'Oliver', age:5,   gender:'m'}
+                // ];
+              </pre>
+            </dd>
+            <dt>
+              <strong class="fn">ne</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is <em>not equal</em> to passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                var results = $Q(data).where('gender').ne('m').get();
+
+                // [
+                //   {name:'Carol',  age:35,  gender:'f', occupation:'housewife'},
+                //   {name:'Marcia', age:13,  gender:'f'},
+                //   {name:'Jan',    age:11,  gender:'f'},
+                //   {name:'Cindy',  age:8,   gender:'f'},
+                //   {name:'Alice',  age:43,  gender:'f', occupation:'housekeeper'}
+                // ];
+              </pre>
+            </dd>
+            <dt>
+              <strong class="fn">gt</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is greater than passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                $Q(data).where('age').gt(40);
+
+                // Returns:
+                // [
+                //    {name:'Alice',  age:43,  gender:'f', occupation:'housekeeper'},
+                //    {name:'Sam',    age:47,  gender:'m', occupation:'butcher'}
+                // ];
+              </pre>
+            </dd>
+            <dt>
+              <strong class="fn">lt</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is greater than or equal to passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                $Q(data).where('age').gte(40);
+
+                // Returns:
+                // [
+                //    {name:'Alice',  age:43,  gender:'f', occupation:'housekeeper'},
+                //    {name:'Sam',    age:47,  gender:'m', occupation:'butcher'}
+                // ];
+              </pre>
+            </dd>
+            <dt>
+              <strong class="fn">gte</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is greater than or equal to passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                $Q(data).where('age').gte(40);
+
+                // Returns:
+                // [
+                //    {name:'Alice',  age:43,  gender:'f', occupation:'housekeeper'},
+                //    {name:'Sam',    age:47,  gender:'m', occupation:'butcher'}
+                // ];
+              </pre>
+            </dd>
+            <dt>
+              <strong class="fn">lte</strong> (<span class="arg">value</span>)
+            </dt>
+            <dd>
+              <dl>
+                <dt>@params</dt>
+                <dd>{Number} <strong class="arg">value</strong> Value to compare against object property value</dd>
+                <dt>@returns</dt>
+                <dd>{Boolean} True if object property value is less than or equal to passed value</dd>
+              </dl>
+              <pre class="brush: js;">
+                $Q(data).where('age').lte(9);
+
+                // Returns:
+                // [
+                //   {name:'Bobby',  age:9,   gender:'m', pet:{name:'Tiger'}},
+                //   {name:'Cindy',  age:8,   gender:'f'},
+                //   {name:'Oliver', age:5,   gender:'m'}
+                // ];
+              </pre>
+            </dd>
+          </dl>
+        </div>
+        <div id="type-filters">
+          <h4>Type Filters</h4>
+          <dl>
+            <dt>
+              <strong class="fn">isString</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isNumber</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isBoolean</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isNull</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isUndefined</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isDefined</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isObject</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isArray</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+            <dt>
+              <strong class="fn">isFunction</strong> (&nbsp;)
+            </dt>
+            <dd>
+              <p></p>
+            </dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

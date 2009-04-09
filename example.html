@@ -1,0 +1,168 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+	<title>$Q2</title>
+	<style type="text/css" media="screen">
+	 textarea { background:#000; color:#0f0; border:0; padding:0.5em; clear:both;}
+	 dd.inline,
+	 dt.inline { display:inline; margin:0; }
+	</style>
+	<script src="http://assets.dev/js/jquery/jquery-1.3.2.min.js" type="text/javascript" charset="utf-8"></script>
+	<script src="dollarQ-0.9.js" type="text/javascript" charset="utf-8"></script>
+	<script type="text/javascript">
+	(function() {
+    $(function() {
+      
+      var $form = $('form#q_form').submit(function(e) {
+        e.preventDefault();
+      });
+      
+
+      $form.find('input, select').change(function(e) {
+        
+        /**
+         * Parse sample data from textarea
+         */
+        var data = eval('(' + $form.find('textarea#q_data').val() + ')');
+        
+        /**
+         * Instantiate query
+         */
+        var q = $Q(data);
+
+        /**
+         * Filter by gender
+         */        
+        var gender = $form.find('select#q_gender').val();
+
+        if (gender !== '') {
+
+          var w_gender = $Q().where('gender');
+
+          if ($form.find('select#q_gender_inverse').val() === 'is not') {
+            w_gender = w_gender.not();
+          }
+          
+          w_gender = w_gender.eq(gender);
+          
+          q.where(w_gender);
+        }
+        
+        /**
+         * Filter by age
+         */
+        var age = $form.find('input#q_age').val();
+
+        if (age !== '') {
+          if (isNaN(parseInt(age))) {
+            throw new Error('Age ain\'t nuthin\' but a number.');
+          }
+          
+          var w_age = $Q().where('age');
+
+          if ($form.find('select#q_age_inverse').val() === 'is not') {
+            w_age = w_age.not();
+          }
+          
+          var operator = $form.find('select#q_age_operator').val();
+
+          w_age = w_age[operator](age);
+
+          q.where(w_age);          
+        }
+
+        /**
+         * Sort
+         */        
+        var order = $form.find('select#q_order').val();
+
+        if (order !== '') {
+          var direction = $form.find('select#q_direction').val();
+          q.orderBy(order + ' ' + direction);
+        }
+
+        /**
+         * Execute query
+         */
+        console.group('Query');
+          var r = q.getResults();
+          console.log('Query returned %d results', r.length);
+          for (var i = 0, n = r.length; i < n; ++i) {
+            console.log(r[i]);          
+          };
+        console.groupEnd('Query');
+      });
+    });
+
+	})();
+	</script>
+</head>
+<body>
+  
+  <form name="q_form" id="q_form">
+    <dl>
+      <dt><label for="q_data"><strong>select</strong> from</label></dt>
+      <dd>
+        <textarea name="q_data" id="q_data" cols="80" rows="10">[
+  {name:'Mike',   age:37,  gender:'m', dob:(new Date('1/1/2009')), occupation:'architect'},
+  {name:'Carol',  age:35,  gender:'f', dob:(new Date('2/1/2009')), occupation:'housewife'},
+  {name:'Greg',   age:15,  gender:'m', dob:(new Date('3/1/2009'))},
+  {name:'Marcia', age:13,  gender:'f', dob:(new Date('4/1/2009'))},
+  {name:'Peter',  age:12,  gender:'m', dob:(new Date('5/1/2009'))},
+  {name:'Jan',    age:11,  gender:'f', dob:(new Date('6/1/2009'))},
+  {name:'Bobby',  age:9,   gender:'m', dob:(new Date('7/1/2009')), pet:{'name':'Tiger'}},
+  {name:'Cindy',  age:8,   gender:'f', dob:(new Date('8/1/2009'))},
+  {name:'Alice',  age:43,  gender:'f', dob:(new Date('9/1/2009')), occupation:'housekeeper'}          
+]</textarea>
+      </dd>
+      <dt class="inline"><label for="q_gender">where <strong>gender</strong></label></dt>
+      <dd class="inline">
+        <select name="q_gender_inverse" id="q_gender_inverse">
+          <option value="is">is</option>
+          <option value="is not">is not</option>
+        </select>
+        <select name="q_gender" id="q_gender">
+          <option value=""></option>
+          <option value="f">Female</option>
+          <option value="m">Male</option>
+        </select>
+      </dd>
+      <dt class="inline"><label for="q_age">and <strong>age</strong></label></dt>
+      <dd class="inline">
+        <select name="q_age_inverse" id="q_age_inverse">
+          <option value="is">is</option>
+          <option value="is not">is not</option>
+        </select>
+        <select name="q_age_operator" id="q_age_operator">
+          <option value="eq">==</option>
+          <option value="ne">!=</option>
+          <option value="gt">&gt;</option>
+          <option value="lt">&lt;</option>
+          <option value="gte">&gt;=</option>
+          <option value="lte">&lt;=</option>
+        </select>
+        <input type="text" name="q_age" id="q_age" value="" size="3"/> 
+      </dd>
+      <dt class="inline"><label for="q_order">order by</label></dt>
+      <dd class="inline">
+        <select name="q_order" id="q_order">
+          <option value=""></option>
+          <option value="name">name</option>
+          <option value="age">age</option>
+          <option value="gender">gender</option>
+        </select>
+        <select name="q_direction" id="q_direction">
+          <option value="asc">asc</option>
+          <option value="desc">desc</option>
+        </select>
+      </dd>
+    </dl>
+    
+    <input type="submit" name="q_select" id="q_select" value="Select"/>
+  </form>
+</body>
+</html>

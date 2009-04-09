@@ -260,7 +260,7 @@ _$Q.prototype._cleanDeepProperty = function(sProperty) {
  *
  */
 _$Q.prototype._evaluate = function(oData) {
-  for (var i = 0; i < this._nAndEvaluators; ++i) {
+  for (var i = 0; i < this._nAndEvaluatorss; ++i) {
     var oEvaluator = this._aAndEvaluators[i];
     if (!(oEvaluator._evaluate(oData) ^ oEvaluator._inverse)) {
       for (var j = 0; j < this._nOrEvaluators; ++j) {
