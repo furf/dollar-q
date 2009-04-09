@@ -67,7 +67,7 @@
    * @constant
    * @type {RegExp}
    */
-  var VALID_ORDER_REG_EXP = /^([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)(?:\s+(asc|ASC|desc|DESC))?$/;
+  var VALID_ORDER_REG_EXP = /^([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)(?:\:(String|Number|Boolean|Date))?(?:\s+(asc|ASC|desc|DESC))?$/;
 
 
   /**
@@ -222,7 +222,7 @@
       /**
        * Add filter to the query
        */
-      this.query.addFilter(filter, this.isOrFilter)
+      this.query.addFilter(filter, this.isOrFilter);
 
       return this.query;
     };
@@ -277,6 +277,23 @@
   };
   Query.prototype = {
 
+
+
+    _castAsString: function(val) {
+      return new String(val);
+    },
+    
+    _castAsNumber: function(val) {
+      return new Number(val);
+    },
+    
+    _castAsBoolean: function(val) {
+      return new Boolean(val);
+    },
+
+    _castAsDate: function(val) {
+      return new Date(val);
+    },
 
     /**
      * Defines object properties for result objects with optional aliases
@@ -464,6 +481,7 @@
           }
 
           var match = VALID_ORDER_REG_EXP.exec(prop);
+          console.log(match);
 
           /**
            * Validate argument for composition
@@ -475,13 +493,24 @@
           /**
            * If descending order is not explicitly stated, ascending order is applied
            */
-          this._orderProperties.push({
+          var orderProperty =  {
             property:   match[1],
-            descending: match[2] !== undefined && match[2].toUpperCase() === 'DESC'
-          });
+            descending: (typeof match[3] !== 'undefined' && match[3].toUpperCase() === 'DESC')
+          };
+
+          // TODO: check performance of casting and look for optimizations
+          // Possibly create differnt casts for different purposes
+          // ie. maybe casting as date for order can convert to simple integer
+          // where casting as date for select might convert to date
+          if (typeof match[2] !== 'undefined' && typeof this['_castAs' + match[2]] === 'function') {
+            orderProperty.cast = this['_castAs' + match[2]];
+          } else {
+            orderProperty.cast = function(val) { return val; };
+          }
+          
+          this._orderProperties.push(orderProperty);
         }
       }
-
       return this;
     },
 
@@ -562,11 +591,12 @@
           order      = this._orderProperties[orderPropertyIndex],
           property   = order.property,
           descending = order.descending,
+          cast       = order.cast,
           pivot      = data[0];
 
       // TODO: look for optimization to avoid the if
       var goDeep = property.split('.').length > 1;
-      var pivotValue = (goDeep ? getDeepValue(pivot, property) : pivot[property]) || '';
+      var pivotValue = cast((goDeep ? getDeepValue(pivot, property) : pivot[property]) || '');
 
 
       for (var i = 0, len = data.length; i < len; ++i) {
@@ -574,7 +604,7 @@
         var obj = data[i];
 
         // TODO: look for optimization to avoid the if
-        var objValue = (goDeep ? getDeepValue(obj, property) : obj[property]) || '';
+        var objValue = cast((goDeep ? getDeepValue(obj, property) : obj[property]) || '');
 
         if (objValue < pivotValue) {
           // TODO: test ternaries for speed.
@@ -761,7 +791,7 @@
   };
 
   $Q.aliasFilter = function(method, alias) {
-    if (FilterFactory.prototype[method] === undefined) {
+    if (typeof FilterFactory.prototype[method] === 'undefined') {
       throw new Error('FilterFactory ' + method + ' does not exist');
     }
 
