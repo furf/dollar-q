@@ -17,6 +17,18 @@
 	(function() {
     $(function() {
       
+      $('#q_form2').submit(function(e) {
+        e.preventDefault();
+        var data = eval('(' + $form.find('textarea#q_data').val() + ')');
+        var vals = eval('$Q(data).' + $('#q').val());
+        console.group('Query');        
+        for (var i = 0, n = vals.length; i < n; ++i) {
+          var val = vals[i];
+          console.log(val);
+        };
+        console.groupEnd('Query');
+      })
+      
       var $form = $('form#q_form').submit(function(e) {
         e.preventDefault();
       });
@@ -28,11 +40,11 @@
          * Parse sample data from textarea
          */
         var data = eval('(' + $form.find('textarea#q_data').val() + ')');
-        
+
         /**
          * Instantiate query
          */
-        var q = $Q(data);
+        var q = $Q(data).select('name', 'dob');
 
         /**
          * Filter by gender
@@ -89,7 +101,7 @@
          * Execute query
          */
         console.group('Query');
-          var r = q.getResults();
+          var r = q.get();
           console.log('Query returned %d results', r.length);
           for (var i = 0, n = r.length; i < n; ++i) {
             console.log(r[i]);          
@@ -103,20 +115,32 @@
 </head>
 <body>
   
+  <form name="q_form2" id="q_form2">
+    <dl>
+      <dt><label for="q"><strong>$Q(data).</strong></dt>
+      <dd class="inline">
+        <input type="text" name="q" id="q" value="orderBy('dob:Date').get();" size="100"/>
+        <input type="submit" id="q_submit" value="get"/>
+      </dd>
+    </dl>
+  </form>  
+
+
   <form name="q_form" id="q_form">
     <dl>
       <dt><label for="q_data"><strong>select</strong> from</label></dt>
       <dd>
-        <textarea name="q_data" id="q_data" cols="80" rows="10">[
-  {name:'Mike',   age:37,  gender:'m', dob:(new Date('1/1/2009')), occupation:'architect'},
-  {name:'Carol',  age:35,  gender:'f', dob:(new Date('2/1/2009')), occupation:'housewife'},
-  {name:'Greg',   age:15,  gender:'m', dob:(new Date('3/1/2009'))},
-  {name:'Marcia', age:13,  gender:'f', dob:(new Date('4/1/2009'))},
-  {name:'Peter',  age:12,  gender:'m', dob:(new Date('5/1/2009'))},
-  {name:'Jan',    age:11,  gender:'f', dob:(new Date('6/1/2009'))},
-  {name:'Bobby',  age:9,   gender:'m', dob:(new Date('7/1/2009')), pet:{'name':'Tiger'}},
-  {name:'Cindy',  age:8,   gender:'f', dob:(new Date('8/1/2009'))},
-  {name:'Alice',  age:43,  gender:'f', dob:(new Date('9/1/2009')), occupation:'housekeeper'}          
+        <textarea name="q_data" id="q_data" cols="100" rows="16">[
+  {name:'Mike',   age:37,  gender:'m', dob:'8/1/2009',  occupation:'architect'},
+  {name:'Carol',  age:35,  gender:'f', dob:'3/1/2009',  occupation:'housewife'},
+  {name:'Greg',   age:15,  gender:'m', dob:'5/1/2009'},
+  {name:'Marcia', age:13,  gender:'f', dob:'7/1/2009'},
+  {name:'Peter',  age:12,  gender:'m', dob:'9/1/2009'},
+  {name:'Jan',    age:11,  gender:'f', dob:'6/1/2009'},
+  {name:'Bobby',  age:9,   gender:'m', dob:'2/1/2009',  pet:{'name':'Tiger'}},
+  {name:'Cindy',  age:8,   gender:'f', dob:'4/1/2009'},
+  {name:'Alice',  age:43,  gender:'f', dob:'1/1/2009',  occupation:'housekeeper'},
+  {name:'Sam',    age:47,  gender:'m', dob:'10/1/2009', occupation:'butcher'}          
 ]</textarea>
       </dd>
       <dt class="inline"><label for="q_gender">where <strong>gender</strong></label></dt>
@@ -154,6 +178,7 @@
           <option value="name">name</option>
           <option value="age">age</option>
           <option value="gender">gender</option>
+          <option value="dob">dob</option>
         </select>
         <select name="q_direction" id="q_direction">
           <option value="asc">asc</option>
