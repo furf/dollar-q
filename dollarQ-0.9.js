@@ -571,8 +571,11 @@
 
       // TODO: look for optimization to avoid the if
       var goDeep = property.split('.').length > 1;
-      var pivotValue = cast((goDeep ? getDeepValue(pivot, property) : pivot[property]) || '');
+      var pivotValue = (goDeep ? getDeepValue(pivot, property) : pivot[property]) || '';
 
+      if (typeof cast === 'function') {
+        pivotValue = cast(pivotValue);
+      }
 
       for (var i = 0, len = data.length; i < len; ++i) {
 
@@ -581,7 +584,11 @@
         // TODO: look for optimization here
         // avoid the if?
         // remove cast if not needed?
-        var objValue = cast((goDeep ? getDeepValue(obj, property) : obj[property]) || '');
+        var objValue = (goDeep ? getDeepValue(obj, property) : obj[property]) || '';
+
+        if (typeof cast === 'function') {
+          objValue = cast(objValue);
+        }
 
         if (objValue < pivotValue) {
           lesser.push(obj);
@@ -626,7 +633,6 @@
     _execute: function() {
 
       var results = [];
-      var selectIsEmpty = isEmpty(this._selectProperties);
 
       for (var i = 0, len = this._fromObjects.length; i < len; ++i) {
 
@@ -636,25 +642,12 @@
          * If object passes all and/or checks, return an object
          */
         if (this._evaluate(obj)) {
-          /**
-           * If query select is empty, return entire matched object.
-           * Otherwise, return new object containing only the
-           * specified select properties.
-           *
-           * TODO: This nested loop causes a large performance hit.
-           * It is 250-300% slower than without select properties.
-           * Is there another way to process with less impact?
-           * UPDATE: This hit is down to 25% somehow.
-           *
-           * Also, should I consider cloning the results so original
-           * data is unaffected?
-           */
-          results.push(selectIsEmpty ? obj : this._mapPropertiesToAliases(obj));
+          results.push(obj);
         }
       }
 
       /**
-       * TODO: consider moving sort above evaluation for
+       * TODO: consider performing sort above evaluation for
        * queries with limits to eliminate need to evaluate
        * once number of results is achieved.
        * Will need to consider where in the results the range
@@ -670,12 +663,41 @@
        * Return results within offset/limit boundaries
        * TODO: take limit and offset as parameters
        */
-      var limit = (this._limit !== null) ? this._limit : results.length;
+      if (this._limit !== null) {        
+        results = results.splice(this._offset, this._limit);
+      }
 
-      return results.splice(this._offset, limit);
+      /**
+       * If query select is empty, return entire matched object.
+       * Otherwise, return new object containing only the
+       * specified select properties.
+       *
+       * TODO: _mapPropertiesToAliases causes a large performance hit.
+       * It is 250-300% slower than without select properties.
+       * Is there another way to process with less impact?
+       * UPDATE: This hit is down to 25% somehow.
+       *
+       * Also, should I consider cloning the results so original
+       * data is unaffected?
+       */
+      /**
+       * Moved intensive mapping function to after splice so it is not
+       * performed unless absolutely necessary.
+       * Also there is a small performance bump by removing the selectIsEmpty
+       * check on every object
+       */
+      if (!isEmpty(this._selectProperties)) {
+        for (var i = 0, n = results.length; i < n; ++i) {
+          results[i] = this._mapPropertiesToAliases(results[i]);
+        };
+      }
+      return results;
     },
 
 
+    /**
+     * @returns Array of qualified objects
+     */
     get: function() {
       return this._execute();
     },
@@ -864,7 +886,7 @@
   });
 
   $Q.addFilter('hasLength', function(v, curry) {
-    return v.length == curry;
+    return v.length === curry;
   });
 
   $Q.addFilter('custom', function(v, curry) {
