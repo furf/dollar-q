@@ -9,30 +9,6 @@
    */
 
 
-  var extend = function(subclass, superclass, overrides) {
-    if (!superclass || !subclass) {
-      throw new Error('extend failed, please check that all dependencies are included.');
-    }
-    var F = function() {};
-    F.prototype = superclass.prototype;
-    subclass.prototype = new F();
-    subclass.prototype.constructor = subclass;
-    subclass.superclass = superclass.prototype;
-    if (superclass.prototype.constructor == Object.prototype.constructor) {
-      superclass.prototype.constructor = superclass;
-    }
-
-    if (overrides) {
-      for (var i in overrides) {
-        if (overrides.hasOwnProperty(i)) {
-          subclass.prototype[i] = overrides[i];
-        }
-      }
-      // L._IEEnumFix(subclass.prototype, overrides);
-    }
-  };
-
-
   /**
    * Evaluates for a valid property name
    * @private
@@ -375,28 +351,28 @@
        */
       for (var i = 0, argsLen = arguments.length; i < argsLen; ++i) {
 
-        var arg = arguments[i];
+        var data = arguments[i];
 
         /**
          * from accepts either an array of objects or an object as argument
          */
-        arg = (arg instanceof Array) ? arg : [arg];
+        data = (data instanceof Array) ? data : [data];
 
-        for (var j = 0, len = arg.length; j < len; ++j) {
+        for (var j = 0, len = data.length; j < len; ++j) {
 
-          var obj = arg[j];
+          var datum = data[j];
 
           /**
            * Validate argument for type
            */
-          if (typeof obj !== 'object') {
-            throw new TypeError('$Q.from: Invalid argument ' + obj);
+          if (typeof datum !== 'object') {
+            throw new TypeError('$Q.from: Invalid data ' + datum);
           }
 
           /**
            * Add object to the data source
            */
-          this._fromObjects.push(obj);
+          this._fromObjects.push(datum);
         }
       }
 
@@ -481,7 +457,6 @@
           }
 
           var match = VALID_ORDER_REG_EXP.exec(prop);
-          console.log(match);
 
           /**
            * Validate argument for composition
@@ -579,7 +554,7 @@
      * TODO: descending is about 50% slower. ???
      * is unshift that much slower than push?
      */
-    _quicksort: function(data, depth, orderPropertyIndex) {
+    _sort: function(data, depth, orderPropertyIndex) {
 
       if (data.length <= 1) {
         return data;
@@ -603,38 +578,29 @@
 
         var obj = data[i];
 
-        // TODO: look for optimization to avoid the if
+        // TODO: look for optimization here
+        // avoid the if?
+        // remove cast if not needed?
         var objValue = cast((goDeep ? getDeepValue(obj, property) : obj[property]) || '');
 
         if (objValue < pivotValue) {
-          // TODO: test ternaries for speed.
-          // Typically they return something, so wouldnt it be
-          // faster to use a regular if statement?
-          // ALSO: the length method is typically faster. why not here?
-          if (descending) {
-            greater.unshift(obj);
-          } else {
-            lesser.push(obj);
-            // lesser[lesser.length] = obj;
-          }
+          lesser.push(obj);
         } else if (objValue > pivotValue) {
-          if (descending) {
-            lesser.unshift(obj);
-          } else {
-            // greater[greater.length] = obj;
-            greater.push(obj);
-          }
+          greater.push(obj);
         } else {
-          // equal[equal.length] = obj;
           equal.push(obj);
         }
       }
 
       if (orderPropertyIndex < this._orderProperties.length - 1) {
-        equal = this._quicksort(equal, depth, orderPropertyIndex + 1);
+        equal = this._sort(equal, depth, orderPropertyIndex + 1);
       }
 
-      return this._quicksort(lesser, depth + 1, orderPropertyIndex).concat(equal.concat(this._quicksort(greater, depth + 1, orderPropertyIndex)));
+      if (descending) {
+        return this._sort(greater, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(lesser, depth + 1, orderPropertyIndex)));
+      } else {
+        return this._sort(lesser, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(greater, depth + 1, orderPropertyIndex)));
+      }
     },
 
 
@@ -696,7 +662,7 @@
        * benefit more.
        */
       if (results.length > 1 && this._orderProperties.length > 0) {
-        results = this._quicksort(results, 0, 0);
+        results = this._sort(results, 0, 0);
       }
 
 
