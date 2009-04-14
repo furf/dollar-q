@@ -47,27 +47,6 @@
 
 
   /**
-   * Determines if an object has any properties
-   * @private
-   * @param {Object} obj Object to examine for properties
-   * @returns {Boolean} True if object contains at least one property
-   */
-  var isEmpty = function(obj) {
-    if (typeof obj === 'object') {
-      for (var prop in obj) {
-        if (obj.hasOwnProperty(prop)) {
-          // var val = obj[prop];
-          // if (val !== undefined && typeof val !== 'function') {
-            return false;
-          // }
-        }
-      }
-    }
-    return true;
-  };
-
-
-  /**
    * Recurses an object to retrieve the value of a nested property.
    * @example getDeepValue({ pet:{ name:'Henry' } }, 'pet.name');
    *
@@ -85,15 +64,15 @@
 
 
   /**
-   * FilterFactory
+   * FilterBuilder
    *
    * Constructs objects whose sole purpose is to append an evaluation function
-   * to a Query filter stack. The FilterFactory prototype contains methods
+   * to a Query filter stack. The FilterBuilder prototype contains methods
    * which dynamically create curried functions (using the property passed to
-   * the FilterFactory constructor and the parameter value passed to the
+   * the FilterBuilder constructor and the parameter value passed to the
    * method) which are used by Query objects to evaluate and filter an object.
    *
-   * FilterFactory can be extended dynamically to include additional custom
+   * FilterBuilder can be extended dynamically to include additional custom
    * methods using the static extend method. This method is made public
    * through the $Q.addFilter method.
    *
@@ -103,7 +82,7 @@
    * @param {Query} query
    * @constructs
    */
-  var FilterFactory = function(prop, query, isOrFilter) {
+  var FilterBuilder = function(prop, query, isOrFilter) {
 
     /**
      *
@@ -127,11 +106,11 @@
     this.inverse  = false;
   };
 
-  FilterFactory.prototype = {
+  FilterBuilder.prototype = {
 
     /**
      * Flips the inverse flag
-     * @returns {Object} FilterFactory object
+     * @returns {Object} FilterBuilder object
      */
     not: function() {
       this.inverse = !this.inverse;
@@ -144,7 +123,7 @@
    * emulate a Query instance to allow us recursive
    * filtering without the instanceof check (15%)
    */
-  FilterFactory.extend = function(name, fn) {
+  FilterBuilder.extend = function(name, fn) {
 
     this.prototype[name] = function(value)  {
 
@@ -167,9 +146,9 @@
         }
 
       /**
-       * If property is splittable, recurse the object
+       * If property is deep, recurse the object
        */
-      } else if (property.split('.').length > 1) {
+      } else if (property.indexOf('.') > -1) {
         if (this.inverse) {
           filter = function(obj) {
             return !fn(getDeepValue(obj, property), value);
@@ -181,8 +160,8 @@
         }
 
       /**
-      * Otherwise, just use the property
-      */
+       * Otherwise, just use the property
+       */
       } else {
         if (this.inverse) {
           filter = function(obj) {
@@ -215,7 +194,7 @@
      * A hash of select properties indexed by their optional aliases
      * @type {Object}
      */
-    this._selectProperties = {};
+    this._selectProperties = [];
 
     /**
      * An array of objects to be filtered and sorted
@@ -258,11 +237,11 @@
     _castAsString: function(val) {
       return new String(val);
     },
-    
+
     _castAsNumber: function(val) {
       return new Number(val);
     },
-    
+
     _castAsBoolean: function(val) {
       return new Boolean(val);
     },
@@ -273,62 +252,45 @@
 
     /**
      * Defines object properties for result objects with optional aliases
-     * @param {String|Array} select properties
+     * @param {String} select properties
      * @returns Query instance
      * @throws Invalid argument
      * @throws Duplicate property
      */
+    /* TODO: add type casting to select */
     select: function() {
 
       /**
        * Reset any previously assigned select properties
        */
-      this._selectProperties = {};
+      this._selectProperties = [];
 
-      /**
-       * select accepts any number of arguments
-       */
-      for (var i = 0, argsLen = arguments.length; i < argsLen; ++i) {
-
-        var arg = arguments[i];
+      for (var i = 0, n = arguments.length; i < n; ++i) {
+        var prop = arguments[i];
 
         /**
-         * select accepts either a string or an array of strings as argument
+         * Validate argument for type
          */
-        arg = (arg instanceof Array) ? arg : [arg];
-
-        for (var j = 0, argLen = arg.length; j < argLen; ++j) {
-
-          var prop = arg[j];
-
-          /**
-           * Validate argument for type
-           */
-          if (typeof prop !== 'string') {
-            throw new TypeError('$Q.select: Invalid argument ' + prop);
-          }
-
-          var match = VALID_SELECT_REG_EXP.exec(prop);
-
-          /**
-           * Validate argument for composition
-           */
-          if (match === null) {
-            throw new TypeError('$Q.select: Invalid argument ' + prop);
-          }
-
-          var key = match[2] || match[1];
-
-          /**
-           * Check for duplicate property
-           */
-          if (this._selectProperties.hasOwnProperty(key)) {
-            throw new Error('$Q.select: Duplicate property ' + key);
-          }
-
-          this._selectProperties[key] = match[1];
-
+        if (typeof prop !== 'string') {
+          throw new TypeError('$Q.select: Invalid argument ' + prop);
         }
+
+        /**
+         * Parse cast type (TODO) and alias
+         */
+        var match = VALID_SELECT_REG_EXP.exec(prop);
+
+        /**
+         * Validate argument for composition
+         */
+        if (match === null) {
+          throw new TypeError('$Q.select: Invalid argument ' + prop);
+        }
+
+        this._selectProperties.push({
+          property: match[1],
+          alias:    match[2] || match[1]
+        });
       }
 
       return this;
@@ -346,35 +308,9 @@
        */
       this._fromObjects = [];
 
-      /**
-       * from accepts any number of arguments
-       */
-      for (var i = 0, argsLen = arguments.length; i < argsLen; ++i) {
-
-        var data = arguments[i];
-
-        /**
-         * from accepts either an array of objects or an object as argument
-         */
-        data = (data instanceof Array) ? data : [data];
-
-        for (var j = 0, len = data.length; j < len; ++j) {
-
-          var datum = data[j];
-
-          /**
-           * Validate argument for type
-           */
-          if (typeof datum !== 'object') {
-            throw new TypeError('$Q.from: Invalid data ' + datum);
-          }
-
-          /**
-           * Add object to the data source
-           */
-          this._fromObjects.push(datum);
-        }
-      }
+      for (var i = 0, n = arguments.length; i < n; ++i) {
+        this._fromObjects = this._fromObjects.concat(arguments[i]);
+      };
 
       return this;
     },
@@ -383,28 +319,33 @@
     /**
      *
      * @param {String|Query}
-     * @returns {FilterFactory} 
+     * @returns {FilterBuilder}
      */
+    /* TODO: add type casting to where */
     where: function(prop) {
+
       if (prop instanceof Query) {
         this._andFilters.push(prop);
         return this;
       }
-      return new FilterFactory(prop, this, false);
+
+      return new FilterBuilder(prop, this, false);
     },
 
 
     /**
      *
      * @param {String|Query}
-     * @returns {FilterFactory} 
+     * @returns {FilterBuilder}
      */
     or: function(prop) {
+
       if (prop instanceof Query) {
         this._orFilters.push(prop);
         return this;
       }
-      return new FilterFactory(prop, this, true);
+
+      return new FilterBuilder(prop, this, true);
     },
 
 
@@ -425,6 +366,7 @@
       }
     },
 
+
     /**
      *
      */
@@ -433,58 +375,46 @@
       // Reset any previously assigned order
       this._orderProperties = [];
 
-      /**
-       * orderBy accepts any number of arguments
-       */
-      for (var i = 0, argsLen = arguments.length; i < argsLen; ++i) {
-
-        var arg = arguments[i];
+      for (var i = 0, n = arguments.length; i < n; ++i) {
+        var prop = arguments[i];
 
         /**
-         * orderBy accepts either a string or an array of strings as argument
+         * Validate argument for type
          */
-        arg = (arg instanceof Array) ? arg : [arg];
-
-        for (var j = 0, argLen = arg.length; j < argLen; ++j) {
-
-          var prop = arg[j];
-
-          /**
-           * Validate argument for type
-           */
-          if (typeof prop !== 'string') {
-            throw new TypeError('$Q.orderBy: Invalid argument ' + prop);
-          }
-
-          var match = VALID_ORDER_REG_EXP.exec(prop);
-
-          /**
-           * Validate argument for composition
-           */
-          if (match === null) {
-            throw new TypeError('$Q.orderBy: Invalid argument ' + prop);
-          }
-
-          /**
-           * If descending order is not explicitly stated, ascending order is applied
-           */
-          var orderProperty =  {
-            property:   match[1],
-            descending: (typeof match[3] !== 'undefined' && match[3].toUpperCase() === 'DESC')
-          };
-
-          // TODO: check performance of casting and look for optimizations
-          // Possibly create differnt casts for different purposes
-          // ie. maybe casting as date for order can convert to simple integer
-          // where casting as date for select might convert to date
-          if (typeof match[2] !== 'undefined' && typeof this['_castAs' + match[2]] === 'function') {
-            orderProperty.cast = this['_castAs' + match[2]];
-          } else {
-            orderProperty.cast = function(val) { return val; };
-          }
-          
-          this._orderProperties.push(orderProperty);
+        if (typeof prop !== 'string') {
+          throw new TypeError('$Q.orderBy: Invalid argument ' + prop);
         }
+
+        /**
+         * Parse cast type and alias
+         */
+        var match = VALID_ORDER_REG_EXP.exec(prop);
+
+        /**
+         * Validate argument for composition
+         */
+        if (match === null) {
+          throw new TypeError('$Q.orderBy: Invalid argument ' + prop);
+        }
+
+        /**
+         * If descending order is not explicitly stated, ascending order is applied
+         */
+        var orderProperty =  {
+          property:   match[1],
+          descending: (typeof match[3] !== 'undefined' && match[3].toUpperCase() === 'DESC')
+        };
+
+        // TODO: check performance of casting and look for optimizations
+        // Possibly create differnt casts for different purposes
+        // ie. maybe casting as date for order can convert to simple integer
+        // where casting as date for select might convert to date
+        if (typeof match[2] !== 'undefined' && typeof this['_castAs' + match[2]] === 'function') {
+          orderProperty.cast = this['_castAs' + match[2]];
+        }
+
+        this._orderProperties.push(orderProperty);
+
       }
       return this;
     },
@@ -518,8 +448,17 @@
      * TODO: There may be a speed benefit to toggling the order
      * of "and" filters and "or" filters depending on the number
      * of each in the query.
+     *
      * Tested: reversing seems to take same time, toggling based
      * on filter lengths is slower by 4%.
+     *
+     * Correction: The toggling test was incorrectly performed inside
+     * the _evaluate method and therefore repeated too often. It's still
+     * possible to check length of "and" and "or" filters outside of
+     * evaluation and call alternate evaluate method.
+     *
+     * If alternate methods are used, there will need to be consideration
+     * for the filter._evaluate which is used to allow nested clauses.
      *
      * @param {Object}
      * @returns {Boolean} True if object meets all specified criteria
@@ -529,14 +468,14 @@
       /**
        * Eliminate an object if it fails any "and" criterion...
        */
-      for (var i = 0, andLen = this._andFilters.length; i < andLen; ++i) {
+      for (var i = 0, n = this._andFilters.length; i < n; ++i) {
 
         if (!this._andFilters[i]._evaluate(obj)) {
 
           /**
            * ...unless it passes any "or" criterion.
            */
-          for (var j = 0, orLen = this._orFilters.length; j < orLen; ++j) {
+          for (var j = 0, m = this._orFilters.length; j < m; ++j) {
 
             if (this._orFilters[j]._evaluate(obj)) {
               return true;
@@ -551,11 +490,12 @@
 
     /**
      * NOTE: WOW! quicksort is really fast!
-     * TODO: descending is about 50% slower. ???
-     * is unshift that much slower than push?
      */
     _sort: function(data, depth, orderPropertyIndex) {
 
+      /**
+       * Move along, nothing to sort here.
+       */
       if (data.length <= 1) {
         return data;
       }
@@ -570,7 +510,7 @@
           pivot      = data[0];
 
       // TODO: look for optimization to avoid the if
-      var goDeep = property.split('.').length > 1;
+      var goDeep = property.indexOf('.') > - 1;
       var pivotValue = (goDeep ? getDeepValue(pivot, property) : pivot[property]) || '';
 
       if (typeof cast === 'function') {
@@ -581,9 +521,7 @@
 
         var obj = data[i];
 
-        // TODO: look for optimization here
-        // avoid the if?
-        // remove cast if not needed?
+        // TODO: look for optimization to avoid the if
         var objValue = (goDeep ? getDeepValue(obj, property) : obj[property]) || '';
 
         if (typeof cast === 'function') {
@@ -603,11 +541,25 @@
         equal = this._sort(equal, depth, orderPropertyIndex + 1);
       }
 
+      /* WOW - nice performance bump from applying push over concat */
+      // .144-.159ms
       if (descending) {
-        return this._sort(greater, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(lesser, depth + 1, orderPropertyIndex)));
+        var r = this._sort(greater, depth + 1, orderPropertyIndex);
+        Array.prototype.push.apply(r, equal);
+        Array.prototype.push.apply(r, this._sort(lesser, depth + 1, orderPropertyIndex));
       } else {
-        return this._sort(lesser, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(greater, depth + 1, orderPropertyIndex)));
+        var r = this._sort(lesser, depth + 1, orderPropertyIndex);
+        Array.prototype.push.apply(r, equal);
+        Array.prototype.push.apply(r, this._sort(greater, depth + 1, orderPropertyIndex));
       }
+      return r;
+
+      // .155-.173ms
+      // if (descending) {
+      //   return this._sort(greater, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(lesser, depth + 1, orderPropertyIndex)));
+      // } else {
+      //   return this._sort(lesser, depth + 1, orderPropertyIndex).concat(equal.concat(this._sort(greater, depth + 1, orderPropertyIndex)));
+      // }
     },
 
 
@@ -616,13 +568,14 @@
      * @returns {Object}
      */
     _mapPropertiesToAliases: function(obj) {
+
       var mappedObj = {};
-      for (var alias in this._selectProperties) {
-        if (this._selectProperties.hasOwnProperty(alias)) {
-          // mappedObj[alias] = obj[this._selectProperties[alias]];
-          mappedObj[alias] = getDeepValue(obj, this._selectProperties[alias]);
-        }
-      }
+
+      for (var i = 0, n = this._selectProperties.length; i < n; ++i) {
+        var select = this._selectProperties[i];
+        mappedObj[select.alias] = getDeepValue(obj, select.property);
+      };
+
       return mappedObj;
     },
 
@@ -634,19 +587,23 @@
 
       var results = [];
 
+      // if (this._orFilters.length === 0) {
+      //   this._evaluate = this._evaluateAndFiltersOnly;
+      // } else if (this._andFilters.length > this._orFilters.length) {
+      //   this._evaluate = this._evaluateOrFiltersBeforeAndFilters;
+      // } else {
+      //   this._evaluate = this._evaluateAndFiltersBeforeOrFilters;
+      // }
+
       for (var i = 0, len = this._fromObjects.length; i < len; ++i) {
-
-        var obj = this._fromObjects[i];
-
-        /**
-         * If object passes all and/or checks, return an object
-         */
-        if (this._evaluate(obj)) {
-          results.push(obj);
+        if (this._evaluate(this._fromObjects[i])) {
+          results.push(this._fromObjects[i]);
         }
       }
 
       /**
+       * orderBy
+       *
        * TODO: consider performing sort above evaluation for
        * queries with limits to eliminate need to evaluate
        * once number of results is achieved.
@@ -654,20 +611,24 @@
        * of results lies. Ranges at top of result set will
        * benefit more.
        */
-      if (results.length > 1 && this._orderProperties.length > 0) {
+      if (this._orderProperties.length > 0) {
         results = this._sort(results, 0, 0);
       }
 
 
       /**
+       * limit
+       *
        * Return results within offset/limit boundaries
        * TODO: take limit and offset as parameters
        */
-      if (this._limit !== null) {        
+      if (this._limit !== null) {
         results = results.splice(this._offset, this._limit);
       }
 
       /**
+       * select
+       *
        * If query select is empty, return entire matched object.
        * Otherwise, return new object containing only the
        * specified select properties.
@@ -682,21 +643,21 @@
        */
       /**
        * Moved intensive mapping function to after splice so it is not
-       * performed unless absolutely necessary.
-       * Also there is a small performance bump by removing the selectIsEmpty
-       * check on every object
+       * performed unless absolutely necessary. Also there is a small
+       * performance bump by removing the selectIsEmpty check on every object
        */
-      if (!isEmpty(this._selectProperties)) {
+      if (this._selectProperties.length > 0) {
         for (var i = 0, n = results.length; i < n; ++i) {
           results[i] = this._mapPropertiesToAliases(results[i]);
         };
       }
+
       return results;
     },
 
 
     /**
-     * @returns Array of qualified objects
+     *
      */
     get: function() {
       return this._execute();
@@ -720,13 +681,28 @@
     },
 
     /**
-     * TODO: make this non-destructive by passing offset and limit to execute
+     *
      */
-    page: function(page, resultsPerPage) {
-      this._offset = (page - 1) * resultsPerPage;
-      this._limit = resultsPerPage;
-      return this._execute();
+    paginate: function(resultsPerPage) {
+
+      var results = this._execute();
+      var page = -1;
+      var pagedResults = [];
+
+      for (var i = 0, n = results.length; i < n; ++i) {
+        if (i % resultsPerPage === 0) {
+          pagedResults[++page] = [];
+        }
+        pagedResults[page].push(results[i]);
+      }
+
+      return {
+        totalResults: results.length,
+        totalPages:   pagedResults.length,
+        pages:        pagedResults
+      };
     },
+
 
     /**
      * Test functions
@@ -775,28 +751,7 @@
   };
 
   $Q.addFilter = function(name, fn) {
-    FilterFactory.extend(name, fn);
-  };
-
-  $Q.aliasFilter = function(method, alias) {
-    if (typeof FilterFactory.prototype[method] === 'undefined') {
-      throw new Error('FilterFactory ' + method + ' does not exist');
-    }
-
-    var aliases = (alias instanceof Array) ? alias : [alias];
-
-    for (var i = 0, len = aliases.length; i < len; ++i) {
-      var alias = aliases[i];
-      FilterFactory.prototype[alias] = FilterFactory.prototype[method];
-    }
-  };
-
-  $Q.aliasFilters = function(aliases) {
-    for (method in aliases) {
-      if (aliases.hasOwnProperty(method)) {
-        $Q.aliasFilter(method, aliases[method]);
-      }
-    }
+    FilterBuilder.extend(name, fn);
   };
 
 
@@ -872,8 +827,9 @@
   });
 
   $Q.addFilter('like', function(v, curry) {
-    var re = new RegExp(curry.replace('%', '.*', 'g'));
-    return re.test(v);
+    // TODO: make this work like the real like function
+    var re = new RegExp(curry.toLowerCase().replace(/%/g, '.*'));
+    return re.test(v.toLowerCase());
   });
 
   $Q.addFilter('in', function(v, curry) {
