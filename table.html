@@ -1,0 +1,350 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+	<title>$Q performance</title>
+	<style type="text/css" media="screen">
+	body {
+	  font:12px/15px helvetical,arial,sans-serif;
+	}
+	table {
+	  border-collapse: collapse;
+	  width:100%;
+	}
+	th {
+	  background:#000;
+	  color:#fff;
+	  padding:0.25em 0.5em;
+	  text-align:left;
+	  border-right:1px solid #fff;
+	}
+	th.sortable {
+	  cursor:pointer;
+	}
+	th .icon {
+	  visibility:hidden;
+	  display:inline-block;
+	  float:right;
+	  width:16px;
+	  height:16px;
+	  background-color:transparent;
+	  background-image:url(sprite.png);
+	  background-repeat:no-repeat;
+	  vertical-align:middle;
+	}
+	th.asc .icon,
+	th.desc .icon {
+	  visibility:visible;
+	}
+	th.asc .icon {
+	  background-position:0px -16px;
+	}
+	th.desc .icon {
+	  background-position:-64px -16px;
+	}
+	th.trans_date {
+	  width:10%;
+	}
+	th.team {
+	  width:20%;
+	}
+	tr.even td {
+	  background:#eee;
+	}
+	td {
+	  vertical-align:top;
+	  padding:0.25em;
+	}
+	td.trans_date {
+	  text-align:center;
+	}
+	ul {
+	  list-style:none;
+	  margin:0;
+	  padding:0;
+	}
+	li {
+	  float:left;
+	  margin-right:0.5em;
+	}
+	</style>
+	<script src="http://assets.dev/js/jquery/jquery-1.3.2.min.js" type="text/javascript" charset="utf-8"></script>
+	<script src="dollarQ-0.9.js" type="text/javascript" charset="utf-8"></script>
+</head>
+
+<body>
+	<script type="text/javascript">
+	(function() {
+
+
+    /**
+     * 
+     */
+    var $QTable = function(cfg) {
+
+
+      var $table,
+          $thead,
+          $tbody,
+          $tfoot;
+
+
+      /**
+       * 
+       */   
+      var paginateData = function(orderProperty) {
+        if (typeof orderProperty !== 'undefined') {
+          query.orderBy(orderProperty);
+        }
+        return query.paginate(cfg.rowsPerPage);
+      };
+
+      
+      /**
+       * 
+       */
+      var renderHeaders = function() {
+        
+        var cols = cfg.cols;
+        
+        var $tr = $('<tr/>');
+        
+        // Render headers
+        for (var i = 0, n = cols.length; i < n; ++i) {
+          
+          var col = cols[i];
+
+          // Render header
+          var $th = $('<th/>')
+            .addClass(col.field)
+            .html(col.title);
+          
+          // Render sortable
+          if (col.sortable === true) {
+            $th
+              .addClass('sortable')
+              .data('field', col.field)
+              
+              // Automatically add type casting for date types
+              .data('cast', (col.type === 'Date') ? ':Date' : '')
+              
+              // Add click event handler
+              .click(function(e) {
+                e.preventDefault();
+                
+                var $this = $(this);
+
+                var sort;
+                
+                if ($this.hasClass('asc')) {
+                  sort = 'desc';
+                  $this.addClass('desc');
+                  $this.removeClass('asc');
+                } else {
+                  sort = 'asc';
+                  $this.addClass('asc');
+                  $this.removeClass('desc');
+                }
+
+                var order = [
+                  $this.data('field'), $this.data('cast'), ' ', sort
+                ].join('');
+
+                // Fetch sorted data
+                pagedResults = paginateData(order);
+                $tbody.replaceWith(renderData(pagedResults.pages[0]));
+                
+                // Reset other headers
+                $this.siblings('th.sortable').removeClass('asc desc');
+                
+              });
+          }
+          
+          $th.appendTo($tr);
+        }
+        $tr.appendTo($thead);
+      };
+
+
+      /**
+       * 
+       */
+      var renderFoot = function() {
+                
+        var cols = cfg.cols;
+        
+        var $tr = $('<tr/>');
+        var $td = $('<td colspan="' + cols.length + '"/>');
+        
+        // Render pagination list
+        if (pagedResults.totalPages > 0) {
+        
+          var $ul = $('<ul/>');
+          
+          // Render links
+          for (var i = 0, n = pagedResults.totalPages; i < n; ++i) {
+            var $li = $('<li/>');
+            var $a = $('<a href="#"/>')
+              .text(i + 1)
+              .data('page', i)
+              
+              // Add click event handler
+              .click(function(e) {
+                e.preventDefault();
+                renderData(pagedResults.pages[$(this).data('page')]);
+              })
+              
+              .appendTo($li);
+            $li.appendTo($ul);
+          }
+          $ul.appendTo($td);
+        }
+        
+        
+        var input = $('<input/>')
+          .keyup(function(e) {
+            pagedResults = $Q(cfg.data).where('note').like('%' + this.value + '%').paginate(cfg.rowsPerPage);
+            renderData(pagedResults.pages[0]);
+          }).appendTo($td);
+        
+        
+        $td.appendTo($tr);
+        $tr.appendTo($tfoot);
+        
+      };
+
+
+      /**
+       * 
+       */
+      var renderData = function(rows) {
+        
+        var $newTbody = $('<tbody/>');
+
+        // Render content
+        if (typeof rows !== 'undefined') {
+          
+          var cols = cfg.cols;
+          
+          // Render rows
+          for (var i = 0, n = rows.length; i < n; ++i) {
+            var row = rows[i];
+            var $tr = $('<tr/>')
+              .addClass(i % 2 ? 'even' : 'odd');
+
+            // Render fields
+            for (var j = 0, m = cols.length; j < m; ++j) {
+              var col = cols[j];
+
+              var data;
+              
+              // Decorate data
+              if (typeof col.decorator === 'function') {
+                data = col.decorator(row[col.field], row);
+              } else {
+                data = row[col.field];
+              }
+
+              var $td = $('<td/>')
+                .addClass(col.field)
+                .html(data)
+                .appendTo($tr);
+            }
+            $tr.appendTo($newTbody);
+          }
+          
+          // Update display
+          $tbody.replaceWith($newTbody);
+          $tbody = $newTbody;
+        }
+      };
+
+
+      /**
+       * 
+       */
+      var renderTable = function() {
+        $table = $('<table/>');
+        $thead = $('<thead/>').appendTo($table);
+        $tfoot = $('<tfoot/>').appendTo($table);
+        $tbody = $('<tbody/>').appendTo($table);
+      };
+
+
+      /**
+       * 
+       */
+      console.time('query');
+      var query = $Q(cfg.data);
+      console.timeEnd('query');
+
+      console.time('paginate');
+      var pagedResults = paginateData();
+      console.timeEnd('paginate');      
+      
+      console.time('table');
+      renderTable();
+      console.timeEnd('table');
+      
+      console.time('headers');
+      renderHeaders();
+      console.timeEnd('headers');
+      
+      console.time('data');
+      renderData(pagedResults.pages[0]);
+      console.timeEnd('data');
+
+      console.time('foot');
+      renderFoot();
+      console.timeEnd('foot');
+
+      $table.appendTo(cfg.el);
+    };
+
+    $.getJSON('transactions2.json', function(response) {
+
+      var rows = response.transaction_all.queryResults.row;
+
+      // Make date format useable
+      $.each(rows, function(row) {
+        var d = this.trans_date.replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/, '$2/$3/$1');
+        this.trans_date = d;
+      });
+
+
+
+
+      var table = $QTable({
+        el:           document.body,
+        data:         rows,
+        rowsPerPage:  50,
+        cols: [{
+          field:      'trans_date',
+          title:      '<span class="icon"></span>Date',
+          type:       'String',
+          sortable:   true
+        }, {
+          field:      'team',
+          title:      '<span class="icon"></span>Team',
+          type:       'String',
+          sortable:   true,
+          decorator:  function(field, row) {
+            return $('<a/>').attr('href', '?team_id=' + row.team_id).text(field);
+          }
+        }, {
+          field:      'note',
+          title:      'Transaction',
+          type:       'String',
+          sortable:   false
+        }]
+      });
+
+    });
+    
+	})();
+	</script>
+</body>
+</html>
