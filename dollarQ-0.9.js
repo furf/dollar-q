@@ -510,7 +510,7 @@
           pivot      = data[0];
 
       // TODO: look for optimization to avoid the if
-      var goDeep = property.indexOf('.') > - 1;
+      var goDeep = property.indexOf('.') > -1;
       var pivotValue = (goDeep ? getDeepValue(pivot, property) : pivot[property]) || '';
 
       if (typeof cast === 'function') {
